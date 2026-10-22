@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ouvido direcional</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0e0f11">
+<style>
+:root{
+  --bg:#0e0f11; --panel:#17191c; --line:#24272c; --line2:#32363c;
+  --fg:#e8e6e1; --dim:#9a9790; --mut:#6e6b66;
+  --ok:#3fb27f; --warn:#d8a13a; --accent:#4f8fd8;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg)}
+body{
+  font:400 15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding-block:20px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  max-width:560px;margin-inline:auto;
+  -webkit-text-size-adjust:100%;
+}
+h1{font-size:19px;font-weight:500;margin:0 0 2px;letter-spacing:-.01em}
+.sub{color:var(--mut);font-size:13px;margin:0 0 20px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+label{display:block;font-size:12px;color:var(--dim);letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px}
+select{width:100%;background:#1d2024;color:var(--fg);border:1px solid var(--line2);border-radius:8px;padding:10px;font:inherit;font-size:14px}
+button{
+  width:100%;border:0;border-radius:10px;padding:15px;font:inherit;font-weight:500;font-size:16px;
+  background:var(--ok);color:#06130d;cursor:pointer;-webkit-tap-highlight-color:transparent;
+}
+button.on{background:#c0443f;color:#fff}
+button:disabled{background:#2a2d31;color:var(--mut);cursor:default}
+.meter{position:relative;height:38px;background:#101215;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:8px}
+#bar{position:absolute;left:0;top:0;bottom:0;width:0%;background:var(--ok);transition:width .04s linear}
+#bar.shut{background:#3a3f45}
+#thr{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--warn);left:50%}
+.mrow{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:16px;font-variant-numeric:tabular-nums}
+#state{font-weight:500}
+#state.open{color:var(--ok)}
+.ctl{margin-bottom:17px}
+.ctl:last-child{margin-bottom:0}
+.lbl{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.lbl b{font-size:13px;font-weight:400;color:var(--fg);text-transform:none;letter-spacing:0}
+.lbl span{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:0;accent-color:var(--accent);height:26px}
+.hint{font-size:12px;color:var(--mut);margin-top:5px;line-height:1.45}
+.note{font-size:13px;color:var(--dim);line-height:1.6}
+.note b{color:var(--fg);font-weight:500}
+ol{margin:8px 0 0;padding-left:20px}
+li{margin-bottom:7px;font-size:13px;color:var(--dim)}
+#err{display:none;background:#2a1618;border:1px solid #58282c;color:#f0b4b4;padding:11px;border-radius:8px;font-size:13px;margin-bottom:14px}
+.warn{border-color:#4a3a1c;background:#1e1a12;color:#d9c18e;font-size:13px;padding:11px;border-radius:8px;border-width:1px;border-style:solid;margin-bottom:14px}
+</style>
+</head>
+<body>
+
+<h1>Ouvido direcional</h1>
+<p class="sub">Isola a voz da frente, corta o fundo.</p>
+
+<div id="err"></div>
+
+<div class="panel">
+  <label for="dev">Microfone</label>
+  <select id="dev"><option>Toque em iniciar para liberar</option></select>
+  <p class="hint">Escolha o mic <b>do celular</b>, nunca o do fone. O mic do fone derruba o Bluetooth para HFP e estraga o áudio de saída.</p>
+</div>
+
+<div class="panel">
+  <div class="meter"><div id="bar"></div><div id="thr"></div></div>
+  <div class="mrow"><span id="lvl">—</span><span id="state">parado</span><span id="lat">—</span></div>
+  <button id="go">Iniciar</button>
+</div>
+
+<div class="panel">
+  <div class="ctl">
+    <div class="lbl"><b>Limiar do portão</b><span id="vthr">-45 dB</span></div>
+    <input type="range" id="sthr" min="-70" max="-20" value="-45" step="1">
+    <p class="hint">O controle principal. Suba até a barra parar de acender com o cochicho e só acender quando o professor falar.</p>
+  </div>
+  <div class="ctl">
+    <div class="lbl"><b>Volume</b><span id="vgain">6 dB</span></div>
+    <input type="range" id="sgain" min="-6" max="24" value="6" step="1">
+  </div>
+  <div class="ctl">
+    <div class="lbl"><b>Sustentação</b><span id="vhold">220 ms</span></div>
+    <input type="range" id="shold" min="60" max="700" value="220" step="20">
+    <p class="hint">Quanto o portão fica aberto depois da última sílaba. Baixo demais pica as palavras.</p>
+  </div>
+  <div class="ctl">
+    <div class="lbl"><b>Corte de graves</b><span id="vhp">180 Hz</span></div>
+    <input type="range" id="shp" min="80" max="400" value="180" step="10">
+    <p class="hint">Remove arrastar de cadeira, ar-condicionado e ruído de mesa.</p>
+  </div>
+  <div class="ctl">
+    <div class="lbl"><b>Corte de agudos</b><span id="vlp">5000 Hz</span></div>
+    <input type="range" id="slp" min="3000" max="9000" value="5000" step="250">
+    <p class="hint">Remove chiado, folha de papel e teclado.</p>
+  </div>
+  <div class="ctl">
+    <div class="lbl"><b>Presença</b><span id="vpres">6 dB</span></div>
+    <input type="range" id="spres" min="0" max="12" value="6" step="1">
+    <p class="hint">Realce em 2,5 kHz. É onde moram as consoantes que definem a inteligibilidade.</p>
+  </div>
+</div>
+
+<div class="warn">Comece com o volume baixo e suba devagar. Amplificar ambiente por horas todo dia cobra o preço no ouvido.</div>
+
+<div class="panel">
+  <p class="note"><b>Como calibrar, em aula</b></p>
+  <ol>
+    <li>Celular na carteira, a borda do microfone apontada para o professor, tela para baixo sobre o caderno — o corpo do aparelho já blinda parte do som de trás.</li>
+    <li>Inicie com o limiar em -45 dB e observe a barra em silêncio.</li>
+    <li>Quando os colegas cochicharem, veja até onde a barra sobe. Suba o limiar (linha amarela) uns 4 dB acima desse pico.</li>
+    <li>Confira: com o professor falando a barra fica verde; com o cochicho ela fica cinza e o som não passa.</li>
+    <li>Se ele cortar sílabas, aumente a sustentação. Se vazar cochicho, suba o limiar mais 2 dB.</li>
+  </ol>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const devSel=$('dev'),goBtn=$('go'),bar=$('bar'),thrMark=$('thr'),
+      lvlEl=$('lvl'),stEl=$('state'),latEl=$('lat'),errEl=$('err');
+
+let ctx=null,stream=null,raf=null,running=false;
+let hp,lp,pres,delay,gate,comp,out,ana,buf;
+let openUntil=0;
+
+const P={thr:-45,gain:6,hold:220,hp:180,lp:5000,pres:6};
+
+function fail(m){errEl.textContent=m;errEl.style.display='block'}
+function clearFail(){errEl.style.display='none'}
+
+function bindSlider(sid,vid,key,fmt,apply){
+  const s=$(sid),v=$(vid);
+  const sync=()=>{
+    P[key]=Number(s.value);
+    v.textContent=fmt(P[key]);
+    if(running&&apply)apply(P[key]);
+    if(key==='thr')placeThr();
+  };
+  s.addEventListener('input',sync);
+  sync();
+}
+
+function placeThr(){
+  const pct=Math.max(0,Math.min(100,(P.thr+70)/60*100));
+  thrMark.style.left=pct+'%';
+}
+
+async function listDevices(){
+  try{
+    const ds=await navigator.mediaDevices.enumerateDevices();
+    const ins=ds.filter(d=>d.kind==='audioinput');
+    if(!ins.length)return;
+    devSel.innerHTML='';
+    ins.forEach((d,i)=>{
+      const o=document.createElement('option');
+      o.value=d.deviceId;
+      o.textContent=d.label||('Microfone '+(i+1));
+      devSel.appendChild(o);
+    });
+  }catch(e){}
+}
+
+async function start(){
+  clearFail();
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    fail('Este navegador não libera o microfone. Use o Chrome, e a página precisa estar em HTTPS.');
+    return;
+  }
+  const id=devSel.value;
+  const con={
+    audio:{
+      echoCancellation:false,
+      noiseSuppression:false,
+      autoGainControl:false,
+      channelCount:1
+    }
+  };
+  if(id&&id.length>4)con.audio.deviceId={exact:id};
+
+  try{
+    stream=await navigator.mediaDevices.getUserMedia(con);
+  }catch(e){
+    fail('Não consegui abrir o microfone: '+e.name+'. Verifique a permissão do site.');
+    return;
+  }
+
+  await listDevices();
+
+  ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
+  await ctx.resume();
+
+  const src=ctx.createMediaStreamSource(stream);
+
+  hp=ctx.createBiquadFilter();  hp.type='highpass'; hp.frequency.value=P.hp; hp.Q.value=0.7;
+  lp=ctx.createBiquadFilter();  lp.type='lowpass';  lp.frequency.value=P.lp; lp.Q.value=0.7;
+  pres=ctx.createBiquadFilter();pres.type='peaking';pres.frequency.value=2500;pres.Q.value=1.1;pres.gain.value=P.pres;
+
+  delay=ctx.createDelay(0.2); delay.delayTime.value=0.03;
+
+  gate=ctx.createGain(); gate.gain.value=0;
+
+  comp=ctx.createDynamicsCompressor();
+  comp.threshold.value=-24; comp.knee.value=12; comp.ratio.value=4;
+  comp.attack.value=0.004; comp.release.value=0.18;
+
+  out=ctx.createGain(); out.gain.value=Math.pow(10,P.gain/20);
+
+  ana=ctx.createAnalyser();
+  ana.fftSize=1024; ana.smoothingTimeConstant=0;
+  buf=new Float32Array(ana.fftSize);
+
+  src.connect(hp); hp.connect(lp); lp.connect(pres);
+  pres.connect(ana);
+  pres.connect(delay); delay.connect(gate); gate.connect(comp);
+  comp.connect(out); out.connect(ctx.destination);
+
+  running=true;
+  goBtn.textContent='Parar';
+  goBtn.classList.add('on');
+
+  const bl=(ctx.baseLatency||0), ol=(ctx.outputLatency||0);
+  latEl.textContent=Math.round((bl+ol)*1000+30)+' ms';
+
+  loop();
+}
+
+function loop(){
+  if(!running)return;
+  ana.getFloatTimeDomainData(buf);
+  let s=0;
+  for(let i=0;i<buf.length;i++)s+=buf[i]*buf[i];
+  const rms=Math.sqrt(s/buf.length);
+  const db=20*Math.log10(rms+1e-9);
+
+  const now=ctx.currentTime;
+  if(db>P.thr)openUntil=now+P.hold/1000;
+  const isOpen=now<openUntil;
+
+  gate.gain.setTargetAtTime(isOpen?1:0,now,isOpen?0.008:0.045);
+
+  const pct=Math.max(0,Math.min(100,(db+70)/60*100));
+  bar.style.width=pct+'%';
+  bar.classList.toggle('shut',!isOpen);
+  lvlEl.textContent=(db<-69?'—':Math.round(db)+' dB');
+  stEl.textContent=isOpen?'passando':'bloqueado';
+  stEl.classList.toggle('open',isOpen);
+
+  raf=requestAnimationFrame(loop);
+}
+
+function stop(){
+  running=false;
+  if(raf)cancelAnimationFrame(raf);
+  if(ctx)ctx.close();
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+  ctx=null;stream=null;
+  goBtn.textContent='Iniciar';
+  goBtn.classList.remove('on');
+  bar.style.width='0%';
+  lvlEl.textContent='—';latEl.textContent='—';
+  stEl.textContent='parado';stEl.classList.remove('open');
+}
+
+goBtn.addEventListener('click',()=>running?stop():start());
+
+bindSlider('sthr','vthr','thr',v=>v+' dB',null);
+bindSlider('sgain','vgain','gain',v=>v+' dB',v=>out.gain.setTargetAtTime(Math.pow(10,v/20),ctx.currentTime,0.05));
+bindSlider('shold','vhold','hold',v=>v+' ms',null);
+bindSlider('shp','vhp','hp',v=>v+' Hz',v=>hp.frequency.setTargetAtTime(v,ctx.currentTime,0.05));
+bindSlider('slp','vlp','lp',v=>v+' Hz',v=>lp.frequency.setTargetAtTime(v,ctx.currentTime,0.05));
+bindSlider('spres','vpres','pres',v=>v+' dB',v=>pres.gain.setTargetAtTime(v,ctx.currentTime,0.05));
+
+placeThr();
+listDevices();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
+navigator.mediaDevices&&navigator.mediaDevices.addEventListener&&
+  navigator.mediaDevices.addEventListener('devicechange',listDevices);
+</script>
+</body>
+</html>
